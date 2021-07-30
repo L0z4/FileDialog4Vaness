@@ -2,12 +2,16 @@ package ru.obit.filedialog4vaness
 
 import android.app.Activity
 import android.content.Intent
+import android.database.Cursor
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -17,8 +21,8 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(findViewById(R.id.toolbar))
 
         findViewById<Button>(R.id.btOpenFD).setOnClickListener{
-            startSelectFiles();
-        };
+            startSelectFiles()
+        }
 
     }
 
@@ -43,7 +47,7 @@ class MainActivity : AppCompatActivity() {
     private fun startSelectFiles() {
 
        val intent = Intent()
-           .setAction("ru.obit.FileDialog4Vaness.action.SelectFiles");
+           .setAction("ru.obit.FileDialog4Vaness.action.SelectFiles")
 
         startActivityForResult(Intent.createChooser(intent, "Select files"), 102)
 
@@ -56,7 +60,7 @@ class MainActivity : AppCompatActivity() {
 
             if (data.hasExtra("path")) {
                 findViewById<TextView>(R.id.etSelectedFiles).text =
-                    data.extras?.get("path").toString();
+                    data.extras?.get("path").toString()
             }
         }
     }
@@ -67,7 +71,7 @@ class SelectFiles : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        startSelectFiles();
+        startSelectFiles()
 
     }
 
@@ -76,7 +80,7 @@ class SelectFiles : AppCompatActivity() {
         val intent = Intent()
             .setType("*/*")
             .setAction(Intent.ACTION_GET_CONTENT)
-            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
 
         startActivityForResult(Intent.createChooser(intent, "Select files"), 101)
 
@@ -86,26 +90,67 @@ class SelectFiles : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == 101 && resultCode == RESULT_OK && null != data) {
-            var selectedFiles: Array<String>;
-
+            val strOfFiles = StringBuilder()
+            strOfFiles.append("[")
             if (null != data.clipData) { // checking multiple selection or not
-                selectedFiles = Array(data.clipData!!.itemCount) { _ -> ""};
-                for (i in 0 until data.clipData!!.itemCount) {
-                    selectedFiles[i] = data.clipData?.getItemAt(i)?.uri.toString()
+                val itemsCount = data.clipData!!.itemCount
+                for (i in 0 until itemsCount) {
+                    val flUri = data.clipData?.getItemAt(i)?.uri
+                    val flExt = contentResolver.getType(flUri!!.normalizeScheme())
+                    val fname = getFileName(flUri!!.normalizeScheme())
+                    strOfFiles.append("{\"uri\":\"")
+                        .append(flUri.toString())
+                        .append("\",\"type\":\"")
+                        .append(flExt.toString())
+                        .append("\",\"name\":\"")
+                        .append(fname)
+                        .append("\"}")
+                    if (i != itemsCount - 1)
+                        strOfFiles.append(",")
                 }
             } else {
-                selectedFiles = arrayOf(data.data.toString());
+                val flExt = contentResolver.getType(data.data!!.normalizeScheme())
+                val fname = getFileName(data.data!!.normalizeScheme())
+                strOfFiles.append("{\"uri\":\"")
+                    .append(data.data.toString())
+                    .append("\",\"type\":\"")
+                    .append(flExt.toString())
+                    .append("\",\"name\":\"")
+                    .append(fname)
+                    .append("\"}")
+
             }
 
             val intent = Intent()
-            intent.putExtra("path", selectedFiles.joinToString(separator = "\n"))
+            strOfFiles.append("]")
+            intent.putExtra("path", strOfFiles.toString())
             setResult(Activity.RESULT_OK, intent)
-            finish();
+            finish()
         }
         else {
             setResult(Activity.RESULT_CANCELED, intent)
-            finish();
-        };
+            finish()
+        }
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            val cursor: Cursor? = contentResolver.query(uri, null, null, null, null)
+            if (cursor != null) cursor.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    result =
+                        cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.path
+            val cut = result!!.lastIndexOf('/')
+            if (cut != -1)
+                result = result!!.substring(cut + 1)
+        }
+        return result
     }
 
 }
@@ -116,7 +161,7 @@ class AppExist : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         setResult(Activity.RESULT_OK, intent)
-        finish();
+        finish()
 
     }
 }
